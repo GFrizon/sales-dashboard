@@ -1,69 +1,128 @@
 // ============================================================
-// components/widgets/KpiCard.jsx — VERSÃO FINAL
-// Título incluído dentro do card (wrapper não tem header para KPIs)
+// components/widgets/KpiCard.jsx — VERSÃO MELHORADA
+// Design executivo com tendência, ícones e cores semânticas
 // ============================================================
 'use client';
-import { DollarSign, Users, Tag, Lock, Percent } from 'lucide-react';
+import { DollarSign, Users, Tag, Lock, Percent, TrendingUp, ShoppingCart } from 'lucide-react';
 
 const KPI_CONFIG = {
   'kpi-receita': {
-    title: 'Receita Líquida',
-    field: 'RECEITA_LIQUIDA',
-    icon: DollarSign,
+    title:  'Receita Líquida',
+    field:  'RECEITA_LIQUIDA',
+    icon:   DollarSign,
     format: 'currency',
-    color: 'emerald',
-    sub: 'após descontos',
+    color:  'emerald',
+    desc:   'Após descontos aplicados',
   },
   'kpi-faturamento': {
-    title: 'Faturamento Bruto',
-    field: 'FATURAMENTO_BRUTO',
-    icon: DollarSign,
+    title:  'Faturamento Bruto',
+    field:  'FATURAMENTO_BRUTO',
+    icon:   TrendingUp,
     format: 'currency',
-    color: 'blue',
-    sub: 'QTDE × PREÇO',
+    color:  'blue',
+    desc:   'Qtde × Preço unitário',
   },
   'kpi-ticket': {
-    title: 'Ticket Médio',
-    field: 'TICKET_MEDIO',
-    icon: Tag,
+    title:  'Ticket Médio',
+    field:  'TICKET_MEDIO',
+    icon:   Tag,
     format: 'currency',
-    color: 'violet',
-    sub: 'por pedido',
+    color:  'violet',
+    desc:   'Receita por pedido',
   },
   'kpi-clientes': {
-    title: 'Clientes Únicos',
-    field: 'CLIENTES_UNICOS',
-    icon: Users,
+    title:  'Clientes Ativos',
+    field:  'CLIENTES_UNICOS',
+    icon:   Users,
     format: 'number',
-    color: 'indigo',
-    sub: 'CNPJs distintos',
+    color:  'indigo',
+    desc:   'CNPJs com pedidos',
+  },
+  'kpi-pedidos': {
+    title:  'Total de Pedidos',
+    field:  'TOTAL_PEDIDOS',
+    icon:   ShoppingCart,
+    format: 'number',
+    color:  'cyan',
+    desc:   'Pedidos no período',
   },
   'kpi-desconto': {
-    title: '% Desconto Médio',
-    field: 'DESCONTO_MEDIO',
-    icon: Percent,
+    title:  'Desconto Médio',
+    field:  'DESCONTO_MEDIO',
+    icon:   Percent,
     format: 'percent',
-    color: 'amber',
-    sub: 'média de desconto',
-    thresholds: { ok: 10, warn: 20 },
+    color:  'auto', // calculado dinamicamente
+    desc:   'Média de desconto concedido',
+    thresholds: { good: 10, warn: 20 },
   },
   'kpi-bloqueado': {
-    title: 'Valor Bloqueado',
-    field: 'VALOR_BLOQUEADO',
-    icon: Lock,
+    title:  'Pedidos Bloqueados',
+    field:  'VALOR_BLOQUEADO',
+    icon:   Lock,
     format: 'currency',
-    color: 'red',
-    sub: 'pedidos bloqueados',
+    color:  'red',
+    desc:   'Aguardando liberação',
   },
 };
 
+// Paleta de cores executiva
 const PALETTES = {
-  emerald: { bg: '#f0fdf4', iconBg: '#dcfce7', iconColor: '#16a34a', valColor: '#15803d', subColor: '#86efac', border: '#bbf7d0' },
-  blue:    { bg: '#eff6ff', iconBg: '#dbeafe', iconColor: '#2563eb', valColor: '#1d4ed8', subColor: '#93c5fd', border: '#bfdbfe' },
-  violet:  { bg: '#f5f3ff', iconBg: '#ede9fe', iconColor: '#7c3aed', valColor: '#6d28d9', subColor: '#c4b5fd', border: '#ddd6fe' },
-  indigo:  { bg: '#eef2ff', iconBg: '#e0e7ff', iconColor: '#4338ca', valColor: '#3730a3', subColor: '#a5b4fc', border: '#c7d2fe' },
-  amber:   { bg: '#fffbeb', iconBg: '#fef3c7', iconColor: '#d97706', valColor: '#b45309', subColor: '#fcd34d', border: '#fde68a' },
-  red:     { bg: '#fef2f2', iconBg: '#fee2e2', iconColor: '#dc2626', valColor: '#b91c1c', subColor: '#fca5a5', border: '#fecaca' },
+  emerald: {
+    bg:        'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+    border:    '#a7f3d0',
+    iconBg:    '#10b981',
+    iconColor: '#fff',
+    valColor:  '#065f46',
+    descColor: '#6ee7b7',
+  },
+  blue: {
+    bg:        'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+    border:    '#93c5fd',
+    iconBg:    '#3b82f6',
+    iconColor: '#fff',
+    valColor:  '#1e3a8a',
+    descColor: '#93c5fd',
+  },
+  violet: {
+    bg:        'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
+    border:    '#c4b5fd',
+    iconBg:    '#7c3aed',
+    iconColor: '#fff',
+    valColor:  '#3b0764',
+    descColor: '#c4b5fd',
+  },
+  indigo: {
+    bg:        'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
+    border:    '#a5b4fc',
+    iconBg:    '#4338ca',
+    iconColor: '#fff',
+    valColor:  '#1e1b4b',
+    descColor: '#a5b4fc',
+  },
+  cyan: {
+    bg:        'linear-gradient(135deg, #ecfeff 0%, #cffafe 100%)',
+    border:    '#67e8f9',
+    iconBg:    '#0891b2',
+    iconColor: '#fff',
+    valColor:  '#164e63',
+    descColor: '#67e8f9',
+  },
+  amber: {
+    bg:        'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+    border:    '#fcd34d',
+    iconBg:    '#d97706',
+    iconColor: '#fff',
+    valColor:  '#78350f',
+    descColor: '#fcd34d',
+  },
+  red: {
+    bg:        'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+    border:    '#fca5a5',
+    iconBg:    '#dc2626',
+    iconColor: '#fff',
+    valColor:  '#7f1d1d',
+    descColor: '#fca5a5',
+  },
 };
 
 function fmt(value, format) {
@@ -87,51 +146,64 @@ export default function KpiCard({ widgetId, data, loading }) {
   const config = KPI_CONFIG[widgetId];
   if (!config) return null;
 
-  const { title, icon: Icon, format, sub, thresholds } = config;
-  let colorKey = config.color;
-
+  const { title, icon: Icon, format, desc, thresholds } = config;
   const rawValue = data?.[config.field];
 
-  if (widgetId === 'kpi-desconto' && rawValue != null && thresholds) {
-    if (rawValue > thresholds.warn)    colorKey = 'red';
-    else if (rawValue > thresholds.ok) colorKey = 'amber';
-    else                               colorKey = 'emerald';
+  // Cor dinâmica para desconto
+  let colorKey = config.color;
+  if (colorKey === 'auto' && thresholds) {
+    if (rawValue != null) {
+      if      (rawValue <= thresholds.good) colorKey = 'emerald';
+      else if (rawValue <= thresholds.warn) colorKey = 'amber';
+      else                                  colorKey = 'red';
+    } else {
+      colorKey = 'amber';
+    }
   }
 
   const p = PALETTES[colorKey] || PALETTES.blue;
 
   return (
     <div
-      className="h-full flex flex-col p-4 rounded-xl"
+      className="h-full flex flex-col justify-between p-4 rounded-xl overflow-hidden relative"
       style={{ background: p.bg, border: `1px solid ${p.border}` }}
     >
-      {/* Título + ícone */}
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">
+      {/* Decoração de fundo */}
+      <div
+        className="absolute -right-4 -top-4 w-20 h-20 rounded-full opacity-10"
+        style={{ backgroundColor: p.iconBg }}
+      />
+
+      {/* Header: ícone + título */}
+      <div className="flex items-start justify-between gap-2 relative z-10">
+        <p className="text-xs font-semibold text-gray-500 leading-tight uppercase tracking-wide">
           {title}
-        </span>
+        </p>
         <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ background: p.iconBg }}
+          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm"
+          style={{ backgroundColor: p.iconBg }}
         >
           <Icon className="w-4 h-4" style={{ color: p.iconColor }} />
         </div>
       </div>
 
       {/* Valor principal */}
-      <div className="flex-1 flex items-center">
+      <div className="relative z-10 my-1">
         {loading ? (
-          <div className="h-8 w-28 bg-white/70 rounded-lg animate-pulse" />
+          <div className="h-7 w-24 bg-white/60 rounded-lg animate-pulse" />
         ) : (
-          <span className="text-2xl font-bold tracking-tight" style={{ color: p.valColor }}>
+          <div
+            className="text-2xl font-bold leading-none tracking-tight"
+            style={{ color: p.valColor }}
+          >
             {fmt(rawValue, format)}
-          </span>
+          </div>
         )}
       </div>
 
-      {/* Sub-label */}
-      <p className="text-xs mt-2 font-medium" style={{ color: p.iconColor, opacity: 0.7 }}>
-        {sub}
+      {/* Descrição */}
+      <p className="text-[10px] font-medium relative z-10 truncate" style={{ color: p.descColor }}>
+        {desc}
       </p>
     </div>
   );

@@ -1,20 +1,22 @@
 // ============================================================
 // hooks/useApiData.js — VERSÃO CORRIGIDA
 // Correções:
-//   1. TTL reduzido para 30s (mais reativo a filtros)
-//   2. Cache invalidado quando filtros mudam (clearCacheByPrefix)
-//   3. AbortController corrigido para não vazar memória
-//   4. Melhor tratamento de erros
+//   - Cache keyed por URL completa (inclui params)
+//   - clearApiCache limpa por prefixo de forma correta
+//   - AbortController sem memory leak
+//   - TTL de 60s para dados de dashboard
 // ============================================================
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 const API_BASE = '/api';
 
-// Cache simples no módulo (compartilhado entre renders)
+// Cache em memória (por sessão) — mapa URL → { data, ts }
 const moduleCache = new Map();
 
-// Limpa todas as entradas de cache que contêm determinado prefixo
-// Chamado quando filtros mudam, garantindo dados frescos
+/**
+ * Limpa entradas de cache que contêm o prefixo informado.
+ * Chamado automaticamente quando filtros mudam.
+ */
 export function clearApiCache(prefix = '') {
   if (!prefix) {
     moduleCache.clear();
@@ -25,19 +27,32 @@ export function clearApiCache(prefix = '') {
   }
 }
 
+/**
+ * Hook genérico para buscar dados da API com cache e AbortController.
+ *
+ * @param {string}  endpoint  - Caminho relativo (ex: 'sales/kpis')
+ * @param {string}  params    - Query string (ex: 'dataInicio=2024-01-01&vendedor=...')
+ * @param {object}  options   - { ttl, enabled }
+ */
 export function useApiData(endpoint, params = '', options = {}) {
-  const { ttl = 30_000, enabled = true } = options; // TTL: 30s
-  const [data, setData]       = useState(null);
+  const { ttl = 60_000, enabled = true } = options;
+
+  const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState(null);
-  const abortRef = useRef(null);
+  const [error,   setError]   = useState(null);
+
+  const abortRef    = useRef(null);
+  const isMounted   = useRef(true);
 
   const url = `${API_BASE}/${endpoint}${params ? `?${params}` : ''}`;
 
   const fetchData = useCallback(async () => {
-    if (!enabled) return;
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
 
-    // Verificar cache válido
+    // Cache ainda válido?
     const cached = moduleCache.get(url);
     if (cached && Date.now() - cached.ts < ttl) {
       setData(cached.data);
@@ -45,35 +60,48 @@ export function useApiData(endpoint, params = '', options = {}) {
       return;
     }
 
-    // Cancelar request anterior da MESMA instância do hook
-    if (abortRef.current) {
-      abortRef.current.abort();
-    }
+    // Cancela request anterior desta instância
+    abortRef.current?.abort();
     abortRef.current = new AbortController();
 
     setLoading(true);
     setError(null);
 
     try {
-      const res = await fetch(url, { signal: abortRef.current.signal });
-      if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`);
+      const res = await fetch(url, {
+        signal: abortRef.current.signal,
+        headers: { 'Accept': 'application/json' },
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+
       const json = await res.json();
-      moduleCache.set(url, { data: json, ts: Date.now() });
-      setData(json);
+
+      // Só atualiza estado se o componente ainda estiver montado
+      if (isMounted.current) {
+        moduleCache.set(url, { data: json, ts: Date.now() });
+        setData(json);
+        setError(null);
+      }
     } catch (err) {
-      if (err.name !== 'AbortError') {
+      if (err.name === 'AbortError') return; // cancelamento intencional
+
+      if (isMounted.current) {
         setError(err.message);
         console.error(`[useApiData] ${endpoint}:`, err.message);
       }
     } finally {
-      setLoading(false);
+      if (isMounted.current) setLoading(false);
     }
   }, [url, enabled, ttl]);
 
   useEffect(() => {
+    isMounted.current = true;
     fetchData();
-    // Cleanup: abortar ao desmontar ou ao mudar url
     return () => {
+      isMounted.current = false;
       abortRef.current?.abort();
     };
   }, [fetchData]);
@@ -88,15 +116,11 @@ export function useKpis(filterParams) {
 }
 
 export function useEvolucao(filterParams, agrupamento = 'MES') {
-  const params = filterParams
-    ? `${filterParams}&agrupamento=${agrupamento}`
-    : `agrupamento=${agrupamento}`;
+  const params = [filterParams, `agrupamento=${agrupamento}`].filter(Boolean).join('&');
   return useApiData('sales/evolucao', params);
 }
 
 export function useRanking(tipo, filterParams, limit = 10) {
-  const params = filterParams
-    ? `${filterParams}&limit=${limit}`
-    : `limit=${limit}`;
+  const params = [filterParams, `limit=${limit}`].filter(Boolean).join('&');
   return useApiData(`sales/ranking/${tipo}`, params);
 }

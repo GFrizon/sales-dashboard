@@ -81,12 +81,12 @@ function buildWhereClause(filters = {}) {
   let idx = 1;
 
   if (filters.dataInicio) {
-    conditions.push(`DATA >= :p${idx}`);
-    params[`p${idx++}`] = new Date(filters.dataInicio);
+    conditions.push(`DATA >= TO_DATE(:p${idx}, 'YYYY-MM-DD')`);
+    params[`p${idx++}`] = filters.dataInicio;
   }
   if (filters.dataFim) {
-    conditions.push(`DATA <= :p${idx}`);
-    params[`p${idx++}`] = new Date(filters.dataFim);
+    conditions.push(`DATA < TO_DATE(:p${idx}, 'YYYY-MM-DD') + 1`);
+    params[`p${idx++}`] = filters.dataFim;
   }
   if (filters.vendedor) {
     conditions.push(`REPRES = :p${idx}`);

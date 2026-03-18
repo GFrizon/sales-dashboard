@@ -1,18 +1,19 @@
 // ============================================================
-// components/Dashboard.jsx — VERSÃO CORRIGIDA
-// Correções:
-//   1. GridLayout dinâmico FORA do componente (era recriado a cada render)
-//   2. Dados buscados condicionalmente (só widgets ativos)
-//   3. activeFilterCount vindo do contexto (já calculado lá)
+// components/Dashboard.jsx — VERSÃO PROFISSIONAL
+// Melhorias:
+//   - Header executivo com data/hora e status
+//   - Layout mais relevante para diretores
+//   - Widgets agrupados por categoria
+//   - Modo edição melhorado
 // ============================================================
 'use client';
-import { Suspense, useCallback } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Settings, RefreshCw, LayoutDashboard } from 'lucide-react';
+import { Settings, RefreshCw, LayoutDashboard, TrendingUp, ChevronRight, LayoutGrid } from 'lucide-react';
 
-import { useDashboard }                                   from '../context/DashboardContext';
-import { useKpis, useEvolucao, useRanking, useApiData }   from '../hooks/useApiData';
-import { FilterBar }      from './filters/FilterBar';
+import { useDashboard }                                  from '../context/DashboardContext';
+import { useKpis, useEvolucao, useRanking, useApiData }  from '../hooks/useApiData';
+import { FilterBar }     from './filters/FilterBar';
 import { WidgetSelector } from './layout/WidgetSelector';
 import { WidgetWrapper }  from './layout/WidgetWrapper';
 import { ExportButton }   from './ui/ExportButton';
@@ -26,9 +27,7 @@ const RankingChart  = dynamic(() => import('./widgets/RankingChart'),  { ssr: fa
 const StatusChart   = dynamic(() => import('./widgets/StatusChart'),   { ssr: false });
 const CurvaAbcChart = dynamic(() => import('./widgets/CurvaAbcChart'), { ssr: false });
 
-// ── CORREÇÃO PRINCIPAL: GridLayout FORA do componente ────────
-// Antes: era criado dentro do componente, gerando nova referência a cada render
-// Agora: criado uma única vez quando o módulo é carregado
+// GridLayout fora do componente para evitar re-criação
 const GridLayout = dynamic(
   async () => {
     const mod = await import('react-grid-layout');
@@ -40,43 +39,88 @@ const GridLayout = dynamic(
 );
 
 const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480 };
-const COLS        = { lg: 12,   md: 10,  sm: 6,   xs: 4   };
+const COLS        = { lg: 12, md: 10, sm: 6, xs: 4 };
 
-function Skeleton() {
+function buildAutoLayout(widgets, cols = 12) {
+  const ordered = [...widgets]
+    .filter((w) => w.active)
+    .sort((a, b) => {
+      const pa = a.type === 'KPI' ? 0 : 1;
+      const pb = b.type === 'KPI' ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return String(a.id).localeCompare(String(b.id));
+    });
+
+  const layout = [];
+  let x = 0;
+  let y = 0;
+  let rowH = 0;
+
+  for (const w of ordered) {
+    const width = Math.max(1, Math.min(Number(w.w) || 3, cols));
+    const height = Math.max(1, Number(w.h) || (w.type === 'KPI' ? 2 : 4));
+
+    if (x + width > cols) {
+      x = 0;
+      y += rowH;
+      rowH = 0;
+    }
+
+    layout.push({ i: w.id, x, y, w: width, h: height });
+    x += width;
+    rowH = Math.max(rowH, height);
+  }
+
+  return layout;
+}
+
+function Skeleton({ height = 'full' }) {
   return (
-    <div className="h-full bg-gradient-to-br from-gray-100 to-gray-50 rounded-xl animate-pulse" />
+    <div className={`h-${height} bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl animate-pulse`} />
   );
 }
 
-// ── Componente de dados por widget ID ─────────────────────────
-// Cada hook só é chamado quando o widget está ativo
+// Clock em tempo real
+function LiveClock() {
+  const [time, setTime] = useState('');
+  useEffect(() => {
+    const update = () => {
+      setTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+    };
+    update();
+    const t = setInterval(update, 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  const today = new Date().toLocaleDateString('pt-BR', {
+    weekday: 'short', day: 'numeric', month: 'short',
+  });
+
+  return (
+    <div className="text-right hidden md:block">
+      <div className="text-xs font-bold text-gray-700 tabular-nums">{time}</div>
+      <div className="text-[10px] text-gray-400 capitalize">{today}</div>
+    </div>
+  );
+}
+
+// Busca dados de forma condicional (só widgets ativos)
 function useWidgetData(activeWidgets, params) {
   const has = (id) => activeWidgets.some(w => w.id === id);
 
-  // KPIs
   const { data: kpis,       loading: kpisL  } = useKpis(params);
-
-  // Gráfico de evolução
   const { data: evolucao,   loading: evoL   } = useEvolucao(params);
-
-  // Rankings — só busca se o widget estiver ativo
   const { data: vendedores, loading: vendL  } = useRanking('vendedores', params);
-  const { data: clientes,   loading: cliL   } = useRanking('clientes', params);
+  const { data: clientes,   loading: cliL   } = useRanking('clientes',   params);
   const { data: produtos,   loading: prodL  } = useApiData(
     'sales/ranking/produtos', params ? `${params}&limit=15` : 'limit=15',
     { enabled: has('chart-produtos') }
   );
-
-  // Distribuição e qualidade
-  const { data: status,     loading: statL  } = useApiData('sales/status',    params);
-  const { data: qualidade,  loading: qualL  } = useApiData(
-    'sales/qualidade', params,
+  const { data: status,     loading: statL  } = useApiData('sales/status',   params);
+  const { data: qualidade,  loading: qualL  } = useApiData('sales/qualidade', params,
     { enabled: has('chart-qualidade') }
   );
-
-  // Curva ABC — só busca se ativo (query pesada)
-  const { data: abc,        loading: abcL   } = useApiData(
-    'sales/curva-abc', params,
+  const { data: abc,        loading: abcL   } = useApiData('sales/curva-abc', params,
     { enabled: has('chart-abc') }
   );
 
@@ -90,6 +134,7 @@ function useWidgetData(activeWidgets, params) {
 export default function Dashboard() {
   const { state, dispatch, filterParams, activeFilterCount } = useDashboard();
   const { widgets, editMode } = state;
+  const [lastRefresh, setLastRefresh] = useState(Date.now());
 
   const params        = filterParams();
   const activeWidgets = widgets.filter(w => w.active);
@@ -109,6 +154,20 @@ export default function Dashboard() {
   const handleLayoutChange = useCallback((newLayout) => {
     if (editMode) dispatch({ type: 'UPDATE_LAYOUT', layout: newLayout });
   }, [dispatch, editMode]);
+
+  const handleAutoArrange = useCallback(() => {
+    const autoLayout = buildAutoLayout(widgets, COLS.lg);
+    if (autoLayout.length) {
+      dispatch({ type: 'UPDATE_LAYOUT', layout: autoLayout });
+    }
+  }, [dispatch, widgets]);
+
+  function handleRefresh() {
+    // Limpa cache e força re-fetch
+    import('../hooks/useApiData').then(m => m.clearApiCache());
+    setLastRefresh(Date.now());
+    window.location.reload();
+  }
 
   function renderWidget(widget) {
     const { id, type, title } = widget;
@@ -154,27 +213,34 @@ export default function Dashboard() {
   const kpiCount   = activeWidgets.filter(w => w.type === 'KPI').length;
   const chartCount = activeWidgets.filter(w => w.type !== 'KPI').length;
 
+  // KPIs principais para o header
+  const receitaFmt = kpis?.RECEITA_LIQUIDA
+    ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 }).format(kpis.RECEITA_LIQUIDA)
+    : null;
+
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* ── Topbar ─────────────────────────────────────────── */}
+      {/* ── Topbar executivo ───────────────────────────────── */}
       <header
-        className="bg-white border-b border-gray-100 px-5 sticky top-0 z-40"
-        style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
+        className="bg-white border-b border-gray-100 px-4 sticky top-0 z-40"
+        style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
       >
-        <div className="flex items-center justify-between h-14">
+        <div className="flex items-center justify-between h-14 gap-3">
 
-          {/* Logo */}
+          {/* Logo + título */}
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-sm">
-              <LayoutDashboard className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-md">
+              <TrendingUp className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-gray-900 leading-tight">Dashboard de Vendas</h1>
-              <p className="text-[11px] text-gray-400">
-                {kpiCount} indicadores · {chartCount} gráficos
+              <h1 className="text-sm font-black text-gray-900 leading-tight tracking-tight">
+                Dashboard de Vendas
+              </h1>
+              <p className="text-[10px] text-gray-400 leading-tight">
+                {kpiCount} indicadores · {chartCount} análises
                 {activeFilterCount > 0 && (
-                  <span className="ml-2 text-blue-500 font-semibold">
+                  <span className="ml-1.5 text-blue-600 font-semibold">
                     · {activeFilterCount} filtro{activeFilterCount > 1 ? 's' : ''} ativo{activeFilterCount > 1 ? 's' : ''}
                   </span>
                 )}
@@ -182,27 +248,45 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Receita rápida (se disponível) */}
+          {receitaFmt && !kpisL && (
+            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 rounded-lg border border-emerald-200">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span className="text-xs text-emerald-700 font-medium">Receita:</span>
+              <span className="text-sm font-black text-emerald-800">{receitaFmt}</span>
+            </div>
+          )}
+
           {/* Ações */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-auto">
+            <LiveClock />
             <StatusBadge />
             <ExportButton />
             <button
-              onClick={() => window.location.reload()}
+              onClick={handleRefresh}
               className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
               title="Atualizar dados"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
             <button
+              onClick={handleAutoArrange}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
+              title="Organizar widgets"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span className="hidden sm:block">Organizar</span>
+            </button>
+            <button
               onClick={() => dispatch({ type: 'SET_EDIT_MODE', value: !editMode })}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
                 editMode
-                  ? 'bg-blue-600 text-white shadow-sm'
+                  ? 'bg-blue-600 text-white shadow-md'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              <Settings className="w-3.5 h-3.5" />
-              {editMode ? 'Concluir' : 'Personalizar'}
+              <Settings className={`w-3.5 h-3.5 ${editMode ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
+              <span className="hidden sm:block">{editMode ? 'Concluir' : 'Personalizar'}</span>
             </button>
           </div>
         </div>
@@ -215,29 +299,43 @@ export default function Dashboard() {
       {editMode && <WidgetSelector widgets={widgets} dispatch={dispatch} />}
 
       {/* ── Grid principal ─────────────────────────────────── */}
-      <main className="px-4 pb-8 pt-2">
-        <GridLayout
-          className="layout"
-          layouts={{ lg: layout, md: layout }}
-          breakpoints={BREAKPOINTS}
-          cols={COLS}
-          rowHeight={85}
-          isDraggable={editMode}
-          isResizable={editMode}
-          onLayoutChange={handleLayoutChange}
-          draggableHandle=".drag-handle"
-          margin={[10, 10]}
-          containerPadding={[0, 0]}
-        >
-          {activeWidgets.map(renderWidget).filter(Boolean)}
-        </GridLayout>
+      <main className="px-4 pb-8 pt-3">
+        {activeWidgets.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-gray-400 gap-3">
+            <LayoutDashboard className="w-12 h-12 opacity-30" />
+            <p className="text-sm font-medium">Nenhum widget ativo</p>
+            <button
+              onClick={() => dispatch({ type: 'SET_EDIT_MODE', value: true })}
+              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+            >
+              Personalizar dashboard <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
+          <GridLayout
+            className="layout"
+            layouts={{ lg: layout, md: layout }}
+            breakpoints={BREAKPOINTS}
+            cols={COLS}
+            rowHeight={82}
+            isDraggable={editMode}
+            isResizable={editMode}
+            onLayoutChange={handleLayoutChange}
+            draggableHandle=".drag-handle"
+            margin={[10, 10]}
+            containerPadding={[0, 0]}
+          >
+            {activeWidgets.map(renderWidget).filter(Boolean)}
+          </GridLayout>
+        )}
       </main>
 
       <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         @media print {
           header, .filter-bar, button { display: none !important; }
           .react-grid-item { break-inside: avoid; }
-          body { background: white; }
         }
       `}</style>
     </div>
