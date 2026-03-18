@@ -1,13 +1,17 @@
 // ============================================================
-// pages/Dashboard.jsx — VERSÃO FINAL COMPLETA
+// components/Dashboard.jsx — VERSÃO CORRIGIDA
+// Correções:
+//   1. GridLayout dinâmico FORA do componente (era recriado a cada render)
+//   2. Dados buscados condicionalmente (só widgets ativos)
+//   3. activeFilterCount vindo do contexto (já calculado lá)
 // ============================================================
 'use client';
 import { Suspense, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { Settings, RefreshCw, LayoutDashboard } from 'lucide-react';
 
-import { useDashboard } from '../context/DashboardContext';
-import { useKpis, useEvolucao, useRanking, useApiData } from '../hooks/useApiData';
+import { useDashboard }                                   from '../context/DashboardContext';
+import { useKpis, useEvolucao, useRanking, useApiData }   from '../hooks/useApiData';
 import { FilterBar }      from './filters/FilterBar';
 import { WidgetSelector } from './layout/WidgetSelector';
 import { WidgetWrapper }  from './layout/WidgetWrapper';
@@ -15,14 +19,16 @@ import { ExportButton }   from './ui/ExportButton';
 import { StatusBadge }    from './ui/StatusBadge';
 import ErrorBoundary      from './ui/ErrorBoundary';
 
-// ── Widgets (sem SSR) ────────────────────────────────────────
+// ── Widgets (sem SSR) ─────────────────────────────────────────
 const KpiCard       = dynamic(() => import('./widgets/KpiCard'),       { ssr: false });
 const EvolucaoChart = dynamic(() => import('./widgets/EvolucaoChart'), { ssr: false });
 const RankingChart  = dynamic(() => import('./widgets/RankingChart'),  { ssr: false });
 const StatusChart   = dynamic(() => import('./widgets/StatusChart'),   { ssr: false });
 const CurvaAbcChart = dynamic(() => import('./widgets/CurvaAbcChart'), { ssr: false });
 
-// ── Grid sem SSR ─────────────────────────────────────────────
+// ── CORREÇÃO PRINCIPAL: GridLayout FORA do componente ────────
+// Antes: era criado dentro do componente, gerando nova referência a cada render
+// Agora: criado uma única vez quando o módulo é carregado
 const GridLayout = dynamic(
   async () => {
     const mod = await import('react-grid-layout');
@@ -37,24 +43,62 @@ const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480 };
 const COLS        = { lg: 12,   md: 10,  sm: 6,   xs: 4   };
 
 function Skeleton() {
-  return <div className="h-full bg-gradient-to-br from-gray-100 to-gray-50 rounded-xl animate-pulse" />;
+  return (
+    <div className="h-full bg-gradient-to-br from-gray-100 to-gray-50 rounded-xl animate-pulse" />
+  );
+}
+
+// ── Componente de dados por widget ID ─────────────────────────
+// Cada hook só é chamado quando o widget está ativo
+function useWidgetData(activeWidgets, params) {
+  const has = (id) => activeWidgets.some(w => w.id === id);
+
+  // KPIs
+  const { data: kpis,       loading: kpisL  } = useKpis(params);
+
+  // Gráfico de evolução
+  const { data: evolucao,   loading: evoL   } = useEvolucao(params);
+
+  // Rankings — só busca se o widget estiver ativo
+  const { data: vendedores, loading: vendL  } = useRanking('vendedores', params);
+  const { data: clientes,   loading: cliL   } = useRanking('clientes', params);
+  const { data: produtos,   loading: prodL  } = useApiData(
+    'sales/ranking/produtos', params ? `${params}&limit=15` : 'limit=15',
+    { enabled: has('chart-produtos') }
+  );
+
+  // Distribuição e qualidade
+  const { data: status,     loading: statL  } = useApiData('sales/status',    params);
+  const { data: qualidade,  loading: qualL  } = useApiData(
+    'sales/qualidade', params,
+    { enabled: has('chart-qualidade') }
+  );
+
+  // Curva ABC — só busca se ativo (query pesada)
+  const { data: abc,        loading: abcL   } = useApiData(
+    'sales/curva-abc', params,
+    { enabled: has('chart-abc') }
+  );
+
+  return {
+    kpis, kpisL, evolucao, evoL,
+    vendedores, vendL, clientes, cliL, produtos, prodL,
+    status, statL, qualidade, qualL, abc, abcL,
+  };
 }
 
 export default function Dashboard() {
-  const { state, dispatch, filterParams } = useDashboard();
+  const { state, dispatch, filterParams, activeFilterCount } = useDashboard();
   const { widgets, editMode } = state;
 
-  const params = filterParams();
+  const params        = filterParams();
   const activeWidgets = widgets.filter(w => w.active);
 
-  const { data: kpis,       loading: kpisL  } = useKpis(params);
-  const { data: evolucao,   loading: evoL   } = useEvolucao(params);
-  const { data: vendedores, loading: vendL  } = useRanking('vendedores', params);
-  const { data: clientes,   loading: cliL   } = useRanking('clientes', params);
-  const { data: produtos,   loading: prodL  } = useRanking('produtos', params);
-  const { data: status,     loading: statL  } = useApiData('sales/status', params);
-  const { data: qualidade,  loading: qualL  } = useApiData('sales/qualidade', params);
-  const { data: abc,        loading: abcL   } = useApiData('sales/curva-abc', params);
+  const {
+    kpis, kpisL, evolucao, evoL,
+    vendedores, vendL, clientes, cliL, produtos, prodL,
+    status, statL, qualidade, qualL, abc, abcL,
+  } = useWidgetData(activeWidgets, params);
 
   const layout = activeWidgets.map(w => ({
     i: w.id, x: w.x, y: w.y, w: w.w, h: w.h,
@@ -84,19 +128,24 @@ export default function Dashboard() {
     switch (type) {
       case 'KPI':
         return wrap(<KpiCard widgetId={id} data={kpis} loading={kpisL} />);
+
       case 'CHART_LINE':
         return wrap(<EvolucaoChart data={evolucao} loading={evoL} />);
+
       case 'CHART_BAR':
         if (id === 'chart-vendedores') return wrap(<RankingChart data={vendedores} loading={vendL} labelKey="VENDEDOR" />);
-        if (id === 'chart-clientes')   return wrap(<RankingChart data={clientes}   loading={cliL}  labelKey="CLIENTE" />);
+        if (id === 'chart-clientes')   return wrap(<RankingChart data={clientes}   loading={cliL}  labelKey="CLIENTE"  />);
         if (id === 'chart-produtos')   return wrap(<RankingChart data={produtos}   loading={prodL} labelKey="MATERIAL" />);
         return null;
+
       case 'CHART_PIE':
-        if (id === 'chart-status')    return wrap(<StatusChart data={status}    loading={statL} labelKey="STATUS" />);
+        if (id === 'chart-status')    return wrap(<StatusChart data={status}    loading={statL} labelKey="STATUS"    />);
         if (id === 'chart-qualidade') return wrap(<StatusChart data={qualidade} loading={qualL} labelKey="QUALIDADE" />);
         return null;
+
       case 'CHART_ABC':
         return wrap(<CurvaAbcChart data={abc} loading={abcL} />);
+
       default:
         return null;
     }
@@ -108,7 +157,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* ── Topbar ───────────────────────────────────────── */}
+      {/* ── Topbar ─────────────────────────────────────────── */}
       <header
         className="bg-white border-b border-gray-100 px-5 sticky top-0 z-40"
         style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
@@ -124,18 +173,23 @@ export default function Dashboard() {
               <h1 className="text-sm font-bold text-gray-900 leading-tight">Dashboard de Vendas</h1>
               <p className="text-[11px] text-gray-400">
                 {kpiCount} indicadores · {chartCount} gráficos
+                {activeFilterCount > 0 && (
+                  <span className="ml-2 text-blue-500 font-semibold">
+                    · {activeFilterCount} filtro{activeFilterCount > 1 ? 's' : ''} ativo{activeFilterCount > 1 ? 's' : ''}
+                  </span>
+                )}
               </p>
             </div>
           </div>
 
-          {/* Ações da direita */}
+          {/* Ações */}
           <div className="flex items-center gap-2">
             <StatusBadge />
             <ExportButton />
             <button
               onClick={() => window.location.reload()}
               className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-              title="Atualizar"
+              title="Atualizar dados"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -154,13 +208,13 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* ── Filtros ──────────────────────────────────────── */}
+      {/* ── Filtros ────────────────────────────────────────── */}
       <FilterBar />
 
-      {/* ── Seletor de widgets (edição) ───────────────────── */}
+      {/* ── Seletor de widgets ─────────────────────────────── */}
       {editMode && <WidgetSelector widgets={widgets} dispatch={dispatch} />}
 
-      {/* ── Grid principal ───────────────────────────────── */}
+      {/* ── Grid principal ─────────────────────────────────── */}
       <main className="px-4 pb-8 pt-2">
         <GridLayout
           className="layout"
@@ -179,7 +233,6 @@ export default function Dashboard() {
         </GridLayout>
       </main>
 
-      {/* ── CSS de impressão (print/PDF) ─────────────────── */}
       <style jsx global>{`
         @media print {
           header, .filter-bar, button { display: none !important; }

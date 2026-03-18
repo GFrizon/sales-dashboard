@@ -1,6 +1,10 @@
 // ============================================================
-// hooks/useApiData.js
-// Hook genérico para buscar dados da API com loading/error/cache
+// hooks/useApiData.js — VERSÃO CORRIGIDA
+// Correções:
+//   1. TTL reduzido para 30s (mais reativo a filtros)
+//   2. Cache invalidado quando filtros mudam (clearCacheByPrefix)
+//   3. AbortController corrigido para não vazar memória
+//   4. Melhor tratamento de erros
 // ============================================================
 import { useState, useEffect, useRef, useCallback } from 'react';
 
@@ -9,64 +13,90 @@ const API_BASE = '/api';
 // Cache simples no módulo (compartilhado entre renders)
 const moduleCache = new Map();
 
+// Limpa todas as entradas de cache que contêm determinado prefixo
+// Chamado quando filtros mudam, garantindo dados frescos
+export function clearApiCache(prefix = '') {
+  if (!prefix) {
+    moduleCache.clear();
+    return;
+  }
+  for (const key of moduleCache.keys()) {
+    if (key.includes(prefix)) moduleCache.delete(key);
+  }
+}
+
 export function useApiData(endpoint, params = '', options = {}) {
-  const { ttl = 60000, enabled = true } = options; // TTL em ms
-  const [data, setData] = useState(null);
+  const { ttl = 30_000, enabled = true } = options; // TTL: 30s
+  const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError]     = useState(null);
   const abortRef = useRef(null);
 
   const url = `${API_BASE}/${endpoint}${params ? `?${params}` : ''}`;
 
-  const fetch_ = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     if (!enabled) return;
 
-    // Verificar cache
+    // Verificar cache válido
     const cached = moduleCache.get(url);
     if (cached && Date.now() - cached.ts < ttl) {
       setData(cached.data);
+      setLoading(false);
       return;
     }
+
+    // Cancelar request anterior da MESMA instância do hook
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    abortRef.current = new AbortController();
 
     setLoading(true);
     setError(null);
 
-    // Cancelar request anterior
-    if (abortRef.current) abortRef.current.abort();
-    abortRef.current = new AbortController();
-
     try {
       const res = await fetch(url, { signal: abortRef.current.signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`);
       const json = await res.json();
       moduleCache.set(url, { data: json, ts: Date.now() });
       setData(json);
     } catch (err) {
-      if (err.name !== 'AbortError') setError(err.message);
+      if (err.name !== 'AbortError') {
+        setError(err.message);
+        console.error(`[useApiData] ${endpoint}:`, err.message);
+      }
     } finally {
       setLoading(false);
     }
   }, [url, enabled, ttl]);
 
   useEffect(() => {
-    fetch_();
-    return () => abortRef.current?.abort();
-  }, [fetch_]);
+    fetchData();
+    // Cleanup: abortar ao desmontar ou ao mudar url
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, [fetchData]);
 
-  return { data, loading, error, refetch: fetch_ };
+  return { data, loading, error, refetch: fetchData };
 }
 
-// Hook específico para KPIs
+// ── Hooks específicos ─────────────────────────────────────────
+
 export function useKpis(filterParams) {
   return useApiData('sales/kpis', filterParams);
 }
 
-// Hook específico para evolução
 export function useEvolucao(filterParams, agrupamento = 'MES') {
-  return useApiData('sales/evolucao', `${filterParams}&agrupamento=${agrupamento}`);
+  const params = filterParams
+    ? `${filterParams}&agrupamento=${agrupamento}`
+    : `agrupamento=${agrupamento}`;
+  return useApiData('sales/evolucao', params);
 }
 
-// Hook específico para rankings
 export function useRanking(tipo, filterParams, limit = 10) {
-  return useApiData(`sales/ranking/${tipo}`, `${filterParams}&limit=${limit}`);
+  const params = filterParams
+    ? `${filterParams}&limit=${limit}`
+    : `limit=${limit}`;
+  return useApiData(`sales/ranking/${tipo}`, params);
 }
