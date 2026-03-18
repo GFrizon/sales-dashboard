@@ -9,6 +9,10 @@ const nextConfig = {
     const backendBase = process.env.BACKEND_URL || 'http://localhost:4000';
     return [
       {
+        source: '/auth/:path*',
+        destination: `${backendBase}/auth/:path*`,
+      },
+      {
         source: '/api/:path*',
         destination: `${backendBase}/api/:path*`,
       },

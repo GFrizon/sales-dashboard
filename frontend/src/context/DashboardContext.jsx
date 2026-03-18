@@ -112,7 +112,18 @@ function reducer(state, action) {
 
 // ── Context ───────────────────────────────────────────────────
 const DashboardContext = createContext(null);
-const USER_ID = 'user_default';
+
+function getCurrentUserId() {
+  if (typeof window === 'undefined') return 'user_default';
+  try {
+    const raw = localStorage.getItem('dashboard_user');
+    if (!raw) return 'user_default';
+    const user = JSON.parse(raw);
+    return user?.id || user?.username || 'user_default';
+  } catch {
+    return 'user_default';
+  }
+}
 
 export function DashboardProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -120,7 +131,8 @@ export function DashboardProvider({ children }) {
   // Carregar preferências salvas
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(`dashboard_prefs_${USER_ID}`);
+      const userId = getCurrentUserId();
+      const saved = localStorage.getItem(`dashboard_prefs_${userId}`);
       if (saved) {
         const parsed = JSON.parse(saved);
         dispatch({ type: 'LOAD_PREFERENCES', payload: parsed });
@@ -132,8 +144,9 @@ export function DashboardProvider({ children }) {
   useEffect(() => {
     const t = setTimeout(() => {
       try {
+        const userId = getCurrentUserId();
         localStorage.setItem(
-          `dashboard_prefs_${USER_ID}`,
+          `dashboard_prefs_${userId}`,
           JSON.stringify({ widgets: state.widgets, filters: state.filters })
         );
       } catch { /* ignora */ }

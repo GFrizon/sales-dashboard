@@ -13,6 +13,12 @@ import { useDashboard } from '../../context/DashboardContext';
 // CORREÇÃO: usar proxy do Next.js, não o backend diretamente
 const API_BASE = '/api';
 
+function getAuthHeaders() {
+  if (typeof window === 'undefined') return {};
+  const token = localStorage.getItem('dashboard_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export function ExportButton() {
   const { filterParams } = useDashboard();
   const [open, setOpen]       = useState(false);
@@ -35,11 +41,12 @@ export function ExportButton() {
       const qs     = params ? `?${params}` : '';
 
       // Busca todos os dados em paralelo, com os filtros ativos
+      const headers = { ...getAuthHeaders() };
       const [kpisR, vendR, cliR, prodR] = await Promise.all([
-        fetch(`${API_BASE}/sales/kpis${qs}`).then(r => r.json()),
-        fetch(`${API_BASE}/sales/ranking/vendedores${qs}&limit=50`).then(r => r.json()),
-        fetch(`${API_BASE}/sales/ranking/clientes${qs}&limit=50`).then(r => r.json()),
-        fetch(`${API_BASE}/sales/ranking/produtos${qs}&limit=50`).then(r => r.json()),
+        fetch(`${API_BASE}/sales/kpis${qs}`, { headers }).then(r => r.json()),
+        fetch(`${API_BASE}/sales/ranking/vendedores${qs}&limit=50`, { headers }).then(r => r.json()),
+        fetch(`${API_BASE}/sales/ranking/clientes${qs}&limit=50`, { headers }).then(r => r.json()),
+        fetch(`${API_BASE}/sales/ranking/produtos${qs}&limit=50`, { headers }).then(r => r.json()),
       ]);
 
       const { exportToExcel } = await import('../../utils/export');

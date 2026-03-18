@@ -6,15 +6,18 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "jest"
+    "test": "jest",
+    "hash-password": "node -e \"const b=require('bcryptjs');const p=process.argv[1];if(!p){console.error('Use: npm run hash-password -- SuaSenha');process.exit(1);}b.hash(p,10).then(console.log);\""
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "oracledb": "^6.3.0"
   },

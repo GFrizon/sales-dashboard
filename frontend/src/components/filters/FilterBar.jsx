@@ -11,6 +11,12 @@ import { useState, useEffect, useRef } from 'react';
 import { Filter, X, ChevronDown, Calendar, Check } from 'lucide-react';
 import { useDashboard } from '../../context/DashboardContext';
 
+function getAuthHeaders() {
+  if (typeof window === 'undefined') return {};
+  const token = localStorage.getItem('dashboard_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 // ── Dropdown simples (sem busca obrigatória) ──────────────────
 function FilterSelect({ label, value, onChange, options = [], loading, placeholder = 'Todos' }) {
   const [open, setOpen] = useState(false);
@@ -281,7 +287,7 @@ export function FilterBar() {
 
   useEffect(() => {
     setOptLoading(true);
-    fetch('/api/filters/options')
+    fetch('/api/filters/options', { headers: { ...getAuthHeaders() } })
       .then(r => r.ok ? r.json() : {})
       .then(data => {
         setOptions(data);

@@ -9,16 +9,20 @@ for /f "tokens=2 delims==; " %%p in ('wmic process where "name='node.exe' and co
   taskkill /PID %%p /F >nul 2>nul
 )
 
-echo [1/3] Limpando cache do frontend...
-if exist frontend\.next rmdir /s /q frontend\.next
-
-echo [2/3] Iniciando Backend (API)...
+echo [1/3] Iniciando Backend (API)...
 start "Backend - API" cmd /k "cd /d backend && npm run dev"
 
 timeout /t 2 /nobreak > nul
 
-echo [3/3] Iniciando Frontend...
-start "Frontend - Dashboard" cmd /k "cd /d frontend && npm run dev"
+echo [2/3] Garantindo build do Frontend...
+if not exist frontend\.next\BUILD_ID (
+  cd /d frontend
+  npm run build
+  cd /d ..
+)
+
+echo [3/3] Iniciando Frontend (modo estavel)...
+start "Frontend - Dashboard" cmd /k "cd /d frontend && npm run start"
 
 echo.
 echo =========================================

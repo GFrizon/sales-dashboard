@@ -27,6 +27,12 @@ export function clearApiCache(prefix = '') {
   }
 }
 
+function getAuthHeaders() {
+  if (typeof window === 'undefined') return {};
+  const token = localStorage.getItem('dashboard_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 /**
  * Hook genérico para buscar dados da API com cache e AbortController.
  *
@@ -70,10 +76,18 @@ export function useApiData(endpoint, params = '', options = {}) {
     try {
       const res = await fetch(url, {
         signal: abortRef.current.signal,
-        headers: { 'Accept': 'application/json' },
+        headers: {
+          'Accept': 'application/json',
+          ...getAuthHeaders(),
+        },
       });
 
       if (!res.ok) {
+        if (res.status === 401 && typeof window !== 'undefined') {
+          localStorage.removeItem('dashboard_token');
+          localStorage.removeItem('dashboard_user');
+          window.location.href = '/login';
+        }
         throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       }
 

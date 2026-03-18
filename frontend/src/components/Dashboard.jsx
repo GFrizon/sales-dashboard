@@ -19,6 +19,7 @@ import { WidgetWrapper }  from './layout/WidgetWrapper';
 import { ExportButton }   from './ui/ExportButton';
 import { StatusBadge }    from './ui/StatusBadge';
 import ErrorBoundary      from './ui/ErrorBoundary';
+import { UserMenu }       from './auth/UserMenu';
 
 // ── Widgets (sem SSR) ─────────────────────────────────────────
 const KpiCard       = dynamic(() => import('./widgets/KpiCard'),       { ssr: false });
@@ -288,6 +289,7 @@ export default function Dashboard() {
               <Settings className={`w-3.5 h-3.5 ${editMode ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
               <span className="hidden sm:block">{editMode ? 'Concluir' : 'Personalizar'}</span>
             </button>
+            <UserMenu />
           </div>
         </div>
       </header>
