@@ -1,0 +1,8 @@
+// ============================================================
+// app/page.jsx — Rota raiz
+// ============================================================
+import Dashboard from '../components/Dashboard';
+
+export default function Home() {
+  return <Dashboard />;
+}
