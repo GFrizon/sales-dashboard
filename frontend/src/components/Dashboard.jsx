@@ -1,25 +1,26 @@
 // ============================================================
-// components/Dashboard.jsx — VERSÃO PROFISSIONAL
-// Melhorias:
-//   - Header executivo com data/hora e status
-//   - Layout mais relevante para diretores
-//   - Widgets agrupados por categoria
-//   - Modo edição melhorado
+// components/Dashboard.jsx — COM ABAS DE NAVEGAÇÃO
+// Adicionado: tab switcher (Dashboard | Consultores)
+// Mantido: todo o código original do dashboard executivo
 // ============================================================
 'use client';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Settings, RefreshCw, LayoutDashboard, TrendingUp, ChevronRight, LayoutGrid } from 'lucide-react';
+import {
+  Settings, RefreshCw, LayoutDashboard, TrendingUp,
+  ChevronRight, LayoutGrid, Users,
+} from 'lucide-react';
 
 import { useDashboard }                                  from '../context/DashboardContext';
 import { useKpis, useEvolucao, useRanking, useApiData }  from '../hooks/useApiData';
-import { FilterBar }     from './filters/FilterBar';
+import { FilterBar }      from './filters/FilterBar';
 import { WidgetSelector } from './layout/WidgetSelector';
 import { WidgetWrapper }  from './layout/WidgetWrapper';
 import { ExportButton }   from './ui/ExportButton';
 import { StatusBadge }    from './ui/StatusBadge';
 import ErrorBoundary      from './ui/ErrorBoundary';
 import { UserMenu }       from './auth/UserMenu';
+import ConsultorView      from './ConsultorView';   // ← NOVO
 
 // ── Widgets (sem SSR) ─────────────────────────────────────────
 const KpiCard       = dynamic(() => import('./widgets/KpiCard'),       { ssr: false });
@@ -28,7 +29,6 @@ const RankingChart  = dynamic(() => import('./widgets/RankingChart'),  { ssr: fa
 const StatusChart   = dynamic(() => import('./widgets/StatusChart'),   { ssr: false });
 const CurvaAbcChart = dynamic(() => import('./widgets/CurvaAbcChart'), { ssr: false });
 
-// GridLayout fora do componente para evitar re-criação
 const GridLayout = dynamic(
   async () => {
     const mod = await import('react-grid-layout');
@@ -75,13 +75,12 @@ function buildAutoLayout(widgets, cols = 12) {
   return layout;
 }
 
-function Skeleton({ height = 'full' }) {
+function Skeleton() {
   return (
-    <div className={`h-${height} bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl animate-pulse`} />
+    <div className="h-full bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl animate-pulse" />
   );
 }
 
-// Clock em tempo real
 function LiveClock() {
   const [time, setTime] = useState('');
   useEffect(() => {
@@ -105,7 +104,6 @@ function LiveClock() {
   );
 }
 
-// Busca dados de forma condicional (só widgets ativos)
 function useWidgetData(activeWidgets, params) {
   const has = (id) => activeWidgets.some(w => w.id === id);
 
@@ -132,10 +130,16 @@ function useWidgetData(activeWidgets, params) {
   };
 }
 
+// ─────────────────────────────────────────────────────────────
+// COMPONENTE PRINCIPAL
+// ─────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const { state, dispatch, filterParams, activeFilterCount } = useDashboard();
   const { widgets, editMode } = state;
   const [lastRefresh, setLastRefresh] = useState(Date.now());
+
+  // ── NOVO: controle de aba ───────────────────────────────────
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'consultores'
 
   const params        = filterParams();
   const activeWidgets = widgets.filter(w => w.active);
@@ -164,7 +168,6 @@ export default function Dashboard() {
   }, [dispatch, widgets]);
 
   function handleRefresh() {
-    // Limpa cache e força re-fetch
     import('../hooks/useApiData').then(m => m.clearApiCache());
     setLastRefresh(Date.now());
     window.location.reload();
@@ -214,123 +217,169 @@ export default function Dashboard() {
   const kpiCount   = activeWidgets.filter(w => w.type === 'KPI').length;
   const chartCount = activeWidgets.filter(w => w.type !== 'KPI').length;
 
-  // KPIs principais para o header
   const receitaFmt = kpis?.RECEITA_LIQUIDA
-    ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 }).format(kpis.RECEITA_LIQUIDA)
+    ? new Intl.NumberFormat('pt-BR', {
+        style: 'currency', currency: 'BRL',
+        notation: 'compact', maximumFractionDigits: 1,
+      }).format(kpis.RECEITA_LIQUIDA)
     : null;
 
+  // ─────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* ── Topbar executivo ───────────────────────────────── */}
+      {/* ── HEADER PRINCIPAL ─────────────────────────────────── */}
       <header
         className="bg-white border-b border-gray-100 px-4 sticky top-0 z-40"
         style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
       >
-        <div className="flex items-center justify-between h-14 gap-3">
+        <div className="flex items-center justify-between h-14 gap-2">
 
           {/* Logo + título */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-md">
               <TrendingUp className="w-4 h-4 text-white" />
             </div>
-            <div>
+            <div className="hidden sm:block">
               <h1 className="text-sm font-black text-gray-900 leading-tight tracking-tight">
                 Dashboard de Vendas
               </h1>
-              <p className="text-[10px] text-gray-400 leading-tight">
-                {kpiCount} indicadores · {chartCount} análises
-                {activeFilterCount > 0 && (
-                  <span className="ml-1.5 text-blue-600 font-semibold">
-                    · {activeFilterCount} filtro{activeFilterCount > 1 ? 's' : ''} ativo{activeFilterCount > 1 ? 's' : ''}
-                  </span>
-                )}
-              </p>
+              {activeTab === 'dashboard' && (
+                <p className="text-[10px] text-gray-400 leading-tight">
+                  {kpiCount} indicadores · {chartCount} análises
+                  {activeFilterCount > 0 && (
+                    <span className="ml-1.5 text-blue-600 font-semibold">
+                      · {activeFilterCount} filtro{activeFilterCount > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Receita rápida (se disponível) */}
-          {receitaFmt && !kpisL && (
-            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 rounded-lg border border-emerald-200">
+          {/* ── ABAS DE NAVEGAÇÃO (NOVO) ── */}
+          <div className="flex items-center bg-gray-100 rounded-xl p-1 flex-shrink-0">
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-semibold transition-all ${
+                activeTab === 'dashboard'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <LayoutDashboard className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="hidden xs:block">Dashboard</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('consultores')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-semibold transition-all ${
+                activeTab === 'consultores'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="hidden xs:block">Consultores</span>
+            </button>
+          </div>
+
+          {/* Receita rápida — só no tab Dashboard */}
+          {activeTab === 'dashboard' && receitaFmt && !kpisL && (
+            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 rounded-lg border border-emerald-200 flex-shrink-0">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               <span className="text-xs text-emerald-700 font-medium">Receita:</span>
               <span className="text-sm font-black text-emerald-800">{receitaFmt}</span>
             </div>
           )}
 
-          {/* Ações */}
-          <div className="flex items-center gap-2 ml-auto">
-            <LiveClock />
-            <StatusBadge />
-            <ExportButton />
-            <button
-              onClick={handleRefresh}
-              className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-              title="Atualizar dados"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleAutoArrange}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
-              title="Organizar widgets"
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span className="hidden sm:block">Organizar</span>
-            </button>
-            <button
-              onClick={() => dispatch({ type: 'SET_EDIT_MODE', value: !editMode })}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                editMode
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <Settings className={`w-3.5 h-3.5 ${editMode ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
-              <span className="hidden sm:block">{editMode ? 'Concluir' : 'Personalizar'}</span>
-            </button>
+          {/* Ações — só no tab Dashboard */}
+          <div className="flex items-center gap-1.5 ml-auto">
+            {activeTab === 'dashboard' && (
+              <>
+                <LiveClock />
+                <StatusBadge />
+                <ExportButton />
+                <button
+                  onClick={handleRefresh}
+                  className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                  title="Atualizar dados"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleAutoArrange}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span className="hidden sm:block">Organizar</span>
+                </button>
+                <button
+                  onClick={() => dispatch({ type: 'SET_EDIT_MODE', value: !editMode })}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    editMode
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <Settings className={`w-3.5 h-3.5 ${editMode ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
+                  <span className="hidden sm:block">{editMode ? 'Concluir' : 'Personalizar'}</span>
+                </button>
+              </>
+            )}
             <UserMenu />
           </div>
         </div>
       </header>
 
-      {/* ── Filtros ────────────────────────────────────────── */}
-      <FilterBar />
+      {/* ── CONTEÚDO CONDICIONAL POR ABA ─────────────────────── */}
 
-      {/* ── Seletor de widgets ─────────────────────────────── */}
-      {editMode && <WidgetSelector widgets={widgets} dispatch={dispatch} />}
+      {/* ABA: CONSULTORES */}
+      {activeTab === 'consultores' && <ConsultorView />}
 
-      {/* ── Grid principal ─────────────────────────────────── */}
-      <main className="px-4 pb-8 pt-3">
-        {activeWidgets.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-gray-400 gap-3">
-            <LayoutDashboard className="w-12 h-12 opacity-30" />
-            <p className="text-sm font-medium">Nenhum widget ativo</p>
-            <button
-              onClick={() => dispatch({ type: 'SET_EDIT_MODE', value: true })}
-              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
-            >
-              Personalizar dashboard <ChevronRight className="w-3 h-3" />
-            </button>
-          </div>
-        ) : (
-          <GridLayout
-            className="layout"
-            layouts={{ lg: layout, md: layout }}
-            breakpoints={BREAKPOINTS}
-            cols={COLS}
-            rowHeight={82}
-            isDraggable={editMode}
-            isResizable={editMode}
-            onLayoutChange={handleLayoutChange}
-            draggableHandle=".drag-handle"
-            margin={[10, 10]}
-            containerPadding={[0, 0]}
-          >
-            {activeWidgets.map(renderWidget).filter(Boolean)}
-          </GridLayout>
-        )}
-      </main>
+      {/* ABA: DASHBOARD (original) */}
+      {activeTab === 'dashboard' && (
+        <>
+          {/* Filtros */}
+          <FilterBar />
+
+          {/* Seletor de widgets */}
+          {editMode && <WidgetSelector widgets={widgets} dispatch={dispatch} />}
+
+          {/* Grid principal */}
+          <main className="px-4 pb-8 pt-3">
+            {activeWidgets.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-gray-400 gap-3">
+                <LayoutDashboard className="w-12 h-12 opacity-30" />
+                <p className="text-sm font-medium">Nenhum widget ativo</p>
+                <button
+                  onClick={() => dispatch({ type: 'SET_EDIT_MODE', value: true })}
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Personalizar dashboard <ChevronRight className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <GridLayout
+                className="layout"
+                layouts={{ lg: layout, md: layout }}
+                breakpoints={BREAKPOINTS}
+                cols={COLS}
+                rowHeight={82}
+                isDraggable={editMode}
+                isResizable={editMode}
+                onLayoutChange={handleLayoutChange}
+                draggableHandle=".drag-handle"
+                margin={[10, 10]}
+                containerPadding={[0, 0]}
+              >
+                {activeWidgets.map(renderWidget).filter(Boolean)}
+              </GridLayout>
+            )}
+          </main>
+        </>
+      )}
 
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
