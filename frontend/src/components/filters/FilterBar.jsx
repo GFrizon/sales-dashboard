@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // components/filters/FilterBar.jsx — VERSÃO CORRIGIDA E MELHORADA
 // Filtros funcionais com:
 //   - Tags visuais de filtros ativos
@@ -287,7 +287,12 @@ export function FilterBar() {
 
   useEffect(() => {
     setOptLoading(true);
-    fetch('/api/filters/options', { headers: { ...getAuthHeaders() } })
+    const qp = new URLSearchParams();
+    if (filters.dataInicio) qp.set('dataInicio', filters.dataInicio);
+    if (filters.dataFim) qp.set('dataFim', filters.dataFim);
+    const url = `/api/filters/options${qp.toString() ? `?${qp.toString()}` : ''}`;
+
+    fetch(url, { headers: { ...getAuthHeaders() } })
       .then(r => r.ok ? r.json() : {})
       .then(data => {
         setOptions(data);
@@ -295,7 +300,7 @@ export function FilterBar() {
       })
       .catch(err => console.error('[FilterBar] erro ao buscar opções:', err))
       .finally(() => setOptLoading(false));
-  }, [dispatch]);
+  }, [dispatch, filters.dataInicio, filters.dataFim]);
 
   function setFilter(key, value) {
     dispatch({ type: 'SET_FILTER', key, value });
@@ -413,3 +418,4 @@ export function FilterBar() {
 }
 
 export default FilterBar;
+

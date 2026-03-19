@@ -12,6 +12,7 @@ try {
 }
 
 let pool = null;
+let poolPromise = null;
 let thickModeInitialized = false;
 
 function initOracleClientIfNeeded() {
@@ -53,6 +54,7 @@ const DB_CONFIG = {
 
 async function getPool() {
   if (pool) return pool;
+  if (poolPromise) return poolPromise;
   if (!oracledb) throw new Error('oracledb nao instalado');
 
   initOracleClientIfNeeded();
@@ -61,9 +63,18 @@ async function getPool() {
   oracledb.fetchAsString = [oracledb.CLOB];
   oracledb.autoCommit = true;
 
-  pool = await oracledb.createPool(DB_CONFIG);
-  console.log(`Oracle pool criado -> ${DB_CONFIG.connectString} (user: ${DB_CONFIG.user})`);
-  return pool;
+  poolPromise = oracledb.createPool(DB_CONFIG)
+    .then((createdPool) => {
+      pool = createdPool;
+      console.log(`Oracle pool criado -> ${DB_CONFIG.connectString} (user: ${DB_CONFIG.user})`);
+      return pool;
+    })
+    .catch((err) => {
+      poolPromise = null;
+      throw err;
+    });
+
+  return poolPromise;
 }
 
 async function query(sql, params = []) {

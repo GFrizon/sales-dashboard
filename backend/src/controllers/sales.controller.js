@@ -7,6 +7,7 @@ const cache = require('../utils/cache');
 const mock  = require('../services/mockData.service');
 
 const IS_MOCK = process.env.MOCK_DB === 'true';
+const SALES_CACHE_TTL = parseInt(process.env.SALES_CACHE_TTL_SEC || '86400', 10);
 
 function getFilters(req) {
   return {
@@ -22,14 +23,18 @@ function getFilters(req) {
   };
 }
 
+function salesCacheKey(prefix, filters, extra = '') {
+  return `${prefix}:${JSON.stringify(filters)}${extra ? `:${extra}` : ''}`;
+}
+
 // ── GET /api/sales/kpis ──────────────────────────────────────
 exports.getKpis = async (req, res, next) => {
   try {
     if (IS_MOCK) return res.json(mock.getMockKpis());
 
     const filters = getFilters(req);
-    const cacheKey = `kpis:${JSON.stringify(filters)}`;
-    const cached = cache.get(cacheKey);
+    const cacheKey = salesCacheKey('kpis', filters);
+    const cached = await cache.get(cacheKey);
     if (cached) return res.json(cached);
 
     const { whereClause, params } = buildWhereClause(filters);
@@ -52,7 +57,7 @@ exports.getKpis = async (req, res, next) => {
     `;
     const rows = await query(sql, params);
     const result = rows[0] || {};
-    cache.set(cacheKey, result, 300);
+    await cache.set(cacheKey, result, SALES_CACHE_TTL);
     res.json(result);
   } catch (err) { next(err); }
 };
@@ -64,6 +69,9 @@ exports.getEvolucao = async (req, res, next) => {
 
     const filters = getFilters(req);
     const agrupamento = req.query.agrupamento || 'MES';
+    const cacheKey = salesCacheKey('evolucao', filters, agrupamento);
+    const cached = await cache.get(cacheKey);
+    if (cached) return res.json(cached);
     const { whereClause, params } = buildWhereClause(filters);
     const periodoExpr = agrupamento === 'DIA'
       ? `TO_CHAR(DATA, 'YYYY-MM-DD')`
@@ -83,6 +91,7 @@ exports.getEvolucao = async (req, res, next) => {
       ORDER BY 1
     `;
     const rows = await query(sql, params);
+    await cache.set(cacheKey, rows, SALES_CACHE_TTL);
     res.json(rows);
   } catch (err) { next(err); }
 };
@@ -94,6 +103,9 @@ exports.getRankingVendedores = async (req, res, next) => {
 
     const filters = getFilters(req);
     const limit = parseInt(req.query.limit) || 10;
+    const cacheKey = salesCacheKey('ranking_vendedores', filters, String(limit));
+    const cached = await cache.get(cacheKey);
+    if (cached) return res.json(cached);
     const { whereClause, params } = buildWhereClause(filters);
     const sql = `
       ${BASE_CTE}
@@ -113,6 +125,7 @@ exports.getRankingVendedores = async (req, res, next) => {
       FETCH FIRST ${limit} ROWS ONLY
     `;
     const rows = await query(sql, params);
+    await cache.set(cacheKey, rows, SALES_CACHE_TTL);
     res.json(rows);
   } catch (err) { next(err); }
 };
@@ -124,6 +137,9 @@ exports.getRankingClientes = async (req, res, next) => {
 
     const filters = getFilters(req);
     const limit = parseInt(req.query.limit) || 10;
+    const cacheKey = salesCacheKey('ranking_clientes', filters, String(limit));
+    const cached = await cache.get(cacheKey);
+    if (cached) return res.json(cached);
     const { whereClause, params } = buildWhereClause(filters);
     const sql = `
       ${BASE_CTE}
@@ -139,6 +155,7 @@ exports.getRankingClientes = async (req, res, next) => {
       FETCH FIRST ${limit} ROWS ONLY
     `;
     const rows = await query(sql, params);
+    await cache.set(cacheKey, rows, SALES_CACHE_TTL);
     res.json(rows);
   } catch (err) { next(err); }
 };
@@ -150,6 +167,9 @@ exports.getRankingProdutos = async (req, res, next) => {
 
     const filters = getFilters(req);
     const limit = parseInt(req.query.limit) || 15;
+    const cacheKey = salesCacheKey('ranking_produtos', filters, String(limit));
+    const cached = await cache.get(cacheKey);
+    if (cached) return res.json(cached);
     const { whereClause, params } = buildWhereClause(filters);
     const sql = `
       ${BASE_CTE}
@@ -166,6 +186,7 @@ exports.getRankingProdutos = async (req, res, next) => {
       FETCH FIRST ${limit} ROWS ONLY
     `;
     const rows = await query(sql, params);
+    await cache.set(cacheKey, rows, SALES_CACHE_TTL);
     res.json(rows);
   } catch (err) { next(err); }
 };
@@ -176,6 +197,9 @@ exports.getStatusDistribuicao = async (req, res, next) => {
     if (IS_MOCK) return res.json(mock.getMockStatus());
 
     const filters = getFilters(req);
+    const cacheKey = salesCacheKey('status', filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return res.json(cached);
     const { whereClause, params } = buildWhereClause(filters);
     const sql = `
       ${BASE_CTE}
@@ -190,6 +214,7 @@ exports.getStatusDistribuicao = async (req, res, next) => {
       ORDER BY "RECEITA" DESC
     `;
     const rows = await query(sql, params);
+    await cache.set(cacheKey, rows, SALES_CACHE_TTL);
     res.json(rows);
   } catch (err) { next(err); }
 };
@@ -200,6 +225,9 @@ exports.getQualidade = async (req, res, next) => {
     if (IS_MOCK) return res.json(mock.getMockQualidade());
 
     const filters = getFilters(req);
+    const cacheKey = salesCacheKey('qualidade', filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return res.json(cached);
     const { whereClause, params } = buildWhereClause(filters);
     const sql = `
       ${BASE_CTE}
@@ -213,6 +241,7 @@ exports.getQualidade = async (req, res, next) => {
       GROUP BY QUALIDADE
     `;
     const rows = await query(sql, params);
+    await cache.set(cacheKey, rows, SALES_CACHE_TTL);
     res.json(rows);
   } catch (err) { next(err); }
 };
@@ -223,6 +252,9 @@ exports.getCurvaABC = async (req, res, next) => {
     if (IS_MOCK) return res.json(mock.getMockCurvaABC());
 
     const filters = getFilters(req);
+    const cacheKey = salesCacheKey('curva_abc', filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return res.json(cached);
     const { whereClause, params } = buildWhereClause(filters);
     const sql = `
       ${BASE_CTE},
@@ -246,6 +278,7 @@ exports.getCurvaABC = async (req, res, next) => {
       ORDER BY RECEITA DESC
     `;
     const rows = await query(sql, params);
+    await cache.set(cacheKey, rows, SALES_CACHE_TTL);
     res.json(rows);
   } catch (err) { next(err); }
 };

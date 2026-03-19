@@ -7,7 +7,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import {
-  Settings, RefreshCw, LayoutDashboard, TrendingUp,
+  Settings, RefreshCw, LayoutDashboard,
   ChevronRight, LayoutGrid, Users,
 } from 'lucide-react';
 
@@ -232,15 +232,15 @@ export default function Dashboard() {
 
       {/* ── HEADER PRINCIPAL ─────────────────────────────────── */}
       <header
-        className="bg-white border-b border-gray-100 px-4 sticky top-0 z-40"
+        className="bg-white border-b border-gray-100 px-4 sticky top-0 z-[140]"
         style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
       >
         <div className="flex items-center justify-between h-14 gap-2">
 
           {/* Logo + título */}
           <div className="flex items-center gap-3 flex-shrink-0">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-md">
-              <TrendingUp className="w-4 h-4 text-white" />
+            <div className="w-9 h-9 rounded-xl bg-white border border-gray-200 shadow-sm flex items-center justify-center overflow-hidden">
+              <img src="/branding/bakof-logo.png" alt="Bakof" className="w-7 h-7 object-contain" />
             </div>
             <div className="hidden sm:block">
               <h1 className="text-sm font-black text-gray-900 leading-tight tracking-tight">
@@ -378,6 +378,11 @@ export default function Dashboard() {
               </GridLayout>
             )}
           </main>
+          <div className="px-4 pb-3">
+            <p className="text-[10px] text-gray-400 text-right tracking-wide">
+              Gabriel Chimello Frizon
+            </p>
+          </div>
         </>
       )}
 

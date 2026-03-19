@@ -190,16 +190,19 @@ export default function LoginPage() {
       animation: shake ? 'shake 0.5s ease' : 'none',
     },
     logo: {
-      width: 52,
-      height: 52,
-      background: 'linear-gradient(135deg, #0ea5e9, #2563eb)',
-      borderRadius: 16,
+      width: 84,
+      height: 84,
+      background: '#ffffff',
+      borderRadius: 18,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       margin: '0 auto 20px',
-      boxShadow: '0 8px 24px rgba(14, 165, 233, 0.35)',
+      border: '1px solid rgba(56, 189, 248, 0.2)',
+      boxShadow: '0 10px 28px rgba(14, 165, 233, 0.28)',
+      overflow: 'hidden',
     },
+    logoImg: { width: 64, height: 64, objectFit: 'contain' },
     title: {
       fontSize: 26,
       fontWeight: 700,
@@ -383,11 +386,7 @@ export default function LoginPage() {
 
             {/* Logo */}
             <div style={styles.logo}>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"
-                  stroke="white" strokeWidth="2.2"
-                  strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <img src="/branding/bakof-logo.png" alt="Bakof" style={styles.logoImg} />
             </div>
 
             <h1 style={styles.title}>Dashboard de Vendas</h1>
@@ -544,6 +543,16 @@ export default function LoginPage() {
             letterSpacing: '0.04em',
           }}>
             © {new Date().getFullYear()} Dashboard de Vendas · Acesso interno
+          </p>
+          <p style={{
+            textAlign: 'center',
+            marginTop: 4,
+            fontSize: 10,
+            color: '#64748b',
+            opacity: 0.75,
+            letterSpacing: '0.03em',
+          }}>
+            Gabriel Chimello Frizon
           </p>
         </div>
       </div>

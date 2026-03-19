@@ -85,7 +85,7 @@ export function ExportButton() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-xl w-48 py-1 overflow-hidden">
+        <div className="absolute right-0 top-full mt-1 z-[200] bg-white border border-gray-200 rounded-xl shadow-xl w-48 py-1 overflow-hidden">
           <button
             onClick={handleExcel}
             className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors"
