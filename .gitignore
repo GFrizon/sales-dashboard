@@ -25,3 +25,8 @@ pnpm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Local transfer/reference folders
+ADD/
+hierarquia/
+logo.png

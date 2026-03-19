@@ -7,35 +7,9 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useHierLevel, hierUrl, clearHierCache } from '../hooks/useHierarquia';
 import { useApiData, clearApiCache } from '../hooks/useApiData';
 import { useDashboard } from '../context/DashboardContext';
+import { LS, STRIPES, PERIODOS } from './consultorView.constants';
+import { fmtBRL, fmtFull, fmtPct, fmtPMK, tipoLabel } from './consultorView.formatters';
 
-// ─────────────────────────────────────────────────────────────
-// PALETA
-// ─────────────────────────────────────────────────────────────
-const LS = {
-  0: { rowBg:'#eef2ff', rowHover:'#e0e7ff', border:'#c7d2fe', accent:'#4f46e5', text:'#1e1b4b', sub:'#6366f1', indent:0,  iconBg:'#e0e7ff' },
-  1: { rowBg:'#f0f9ff', rowHover:'#e0f2fe', border:'#bae6fd', accent:'#0284c7', text:'#0c4a6e', sub:'#0ea5e9', indent:24, iconBg:'#e0f2fe' },
-  2: { rowBg:'#faf5ff', rowHover:'#f3e8ff', border:'#e9d5ff', accent:'#7c3aed', text:'#3b0764', sub:'#8b5cf6', indent:48, iconBg:'#ede9fe' },
-  3: { rowBg:'#fffbeb', rowHover:'#fef3c7', border:'#fde68a', accent:'#d97706', text:'#451a03', sub:'#b45309', indent:72, iconBg:'#fef3c7' },
-  4: { rowBg:'#f0fdf4', rowHover:'#dcfce7', border:'#bbf7d0', accent:'#16a34a', text:'#14532d', sub:'#15803d', indent:96, iconBg:'#dcfce7' },
-};
-
-// ─────────────────────────────────────────────────────────────
-// FORMATTERS
-// ─────────────────────────────────────────────────────────────
-const fmtBRL  = v => new Intl.NumberFormat('pt-BR',{ style:'currency', currency:'BRL', notation:'compact', maximumFractionDigits:1 }).format(v||0);
-const fmtFull = v => new Intl.NumberFormat('pt-BR',{ style:'currency', currency:'BRL' }).format(v||0);
-const fmtPct  = v => `${(+v||0).toFixed(1)}%`;
-const fmtPMK  = v => `R$\u202f${(+v||0).toFixed(2)}/kg`;
-
-function tipoLabel(tipo) {
-  const t = String(tipo || '').trim().toUpperCase();
-  if (t === 'R') return 'Revenda';
-  if (t === 'C') return 'Consumo';
-  if (t === 'I') return 'Inscrito';
-  if (t === 'S') return 'Simples Nacional';
-  if (t === 'T') return 'Construtora';
-  return String(tipo || '').trim() || 'N/D';
-}
 
 // ─────────────────────────────────────────────────────────────
 // CSS
@@ -333,7 +307,6 @@ function RepRow({ rep, filters }) {
 // ─────────────────────────────────────────────────────────────
 // NÍVEL 0 — CONSULTOR
 // ─────────────────────────────────────────────────────────────
-const STRIPES = ['#4f46e5','#0284c7','#7c3aed','#059669','#d97706'];
 
 function ConsRow({ cons, idx, filters }) {
   const [open, setOpen] = useState(false);
@@ -506,7 +479,6 @@ function CacheBadge() {
 // ─────────────────────────────────────────────────────────────
 // MAIN
 // ─────────────────────────────────────────────────────────────
-const PERIODOS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 export default function ConsultorView() {
   const { state } = useDashboard();
@@ -789,3 +761,4 @@ export default function ConsultorView() {
     </div>
   );
 }
+
