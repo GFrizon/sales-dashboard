@@ -1,11 +1,11 @@
 ﻿// ============================================================
 // controllers/hierarquia.controller.js
-// TTLs de cache diferentes por nÃ­vel:
-//   Consultores / Resumo  â†’ 5 min   (dados agregados, leves)
-//   Representantes        â†’ 5 min
-//   Clientes              â†’ 5 min
-//   Pedidos               â†’ 10 min  (lista de pedidos, muda pouco)
-//   Itens                 â†’ 30 min  (item de pedido fechado = imutÃ¡vel)
+// TTLs de cache por nivel:
+//   Consultores / Resumo  -> 5 min   (dados agregados, leves)
+//   Representantes        -> 5 min
+//   Clientes              -> 5 min
+//   Pedidos               -> 10 min  (lista de pedidos, muda pouco)
+//   Itens                 -> 30 min  (item de pedido fechado = imutavel)
 // ============================================================
 const svc   = require('../services/hierarquia.service');
 const cache = require('../utils/cache');
@@ -16,7 +16,7 @@ const HIER_CLIS_TTL = parseInt(process.env.HIER_CLIS_TTL_SEC || '43200', 10);
 const HIER_PEDS_TTL = parseInt(process.env.HIER_PEDS_TTL_SEC || '43200', 10);
 const HIER_ITENS_TTL = parseInt(process.env.HIER_ITENS_TTL_SEC || '86400', 10);
 
-// Gera chave de cache estÃ¡vel a partir dos query params
+// Gera chave de cache estavel a partir dos query params
 function cacheKey(prefix, params = {}) {
   const sorted = Object.keys(params)
     .sort()
@@ -26,13 +26,13 @@ function cacheKey(prefix, params = {}) {
   return sorted ? `${prefix}:${sorted}` : prefix;
 }
 
-// Extrai os filtros globais do request (perÃ­odo, UF, etc.)
+// Extrai os filtros globais do request (periodo, UF, etc.)
 function globalFilters(req) {
   const { dataInicio, dataFim, vendedor, cliente, uf, material, tipo, controle, uneg } = req.query;
   return { dataInicio, dataFim, vendedor, cliente, uf, material, tipo, controle, uneg };
 }
 
-// â”€â”€ GET /api/hierarquia/resumo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GET /api/hierarquia/resumo
 exports.resumo = async (req, res, next) => {
   try {
     const filters = globalFilters(req);
@@ -46,7 +46,7 @@ exports.resumo = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// â”€â”€ GET /api/hierarquia/consultores â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GET /api/hierarquia/consultores
 exports.consultores = async (req, res, next) => {
   try {
     const filters = globalFilters(req);
@@ -60,7 +60,7 @@ exports.consultores = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// â”€â”€ GET /api/hierarquia/consultores/:id/representantes â”€â”€â”€â”€
+// GET /api/hierarquia/consultores/:id/representantes
 exports.representantes = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -75,7 +75,7 @@ exports.representantes = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// â”€â”€ GET /api/hierarquia/representantes/:id/clientes â”€â”€â”€â”€â”€â”€â”€
+// GET /api/hierarquia/representantes/:id/clientes
 exports.clientes = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -90,7 +90,7 @@ exports.clientes = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// â”€â”€ GET /api/hierarquia/clientes/:id/pedidos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GET /api/hierarquia/clientes/:id/pedidos
 exports.pedidos = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -105,7 +105,7 @@ exports.pedidos = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// â”€â”€ GET /api/hierarquia/pedidos/:id/itens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GET /api/hierarquia/pedidos/:id/itens
 exports.itens = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -115,12 +115,12 @@ exports.itens = async (req, res, next) => {
     if (hit) return res.json({ rows: hit, _cache: true });
 
     const rows = await svc.getItens(id, uneg);
-    await cache.set(key, rows, HIER_ITENS_TTL); // itens de pedido fechado sÃ£o imutÃ¡veis
+    await cache.set(key, rows, HIER_ITENS_TTL); // itens de pedido fechado sao imutaveis
     res.json({ rows });
   } catch (err) { next(err); }
 };
 
-// â”€â”€ DELETE /api/hierarquia/cache â€” invalida cache (admin) â”€
+// DELETE /api/hierarquia/cache - invalida cache (admin)
 exports.invalidateCache = async (req, res, next) => {
   try {
     await cache.flushPrefix('hier:');

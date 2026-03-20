@@ -55,10 +55,18 @@ app.get('/health', (_, res) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`API rodando em http://localhost:${PORT}`));
 
-runStartupWarmup().finally(() => {
-  scheduleDailyWarmup();
-});
+function startServer(port = PORT) {
+  const server = app.listen(port, () => console.log(`API rodando em http://localhost:${port}`));
+  runStartupWarmup().finally(() => {
+    scheduleDailyWarmup();
+  });
+  return server;
+}
+
+if (require.main === module) {
+  startServer();
+}
 
 module.exports = app;
+module.exports.startServer = startServer;
